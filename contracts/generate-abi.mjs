@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = __dirname;
-const outDir = resolve(root, "..", "web", "lib", "abi");
+const outDir = resolve(root, "..", "lib", "abi");
 mkdirSync(outDir, { recursive: true });
 
 const read = (rel) => ({ content: readFileSync(join(root, rel), "utf8") });

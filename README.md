@@ -10,8 +10,8 @@ tokens are burned, locking liquidity forever.
 
 ```
 curvelaunchpad/
-├── contracts/   # Solidity (Hardhat) — Launchpad + MemeToken + curve math
-└── web/         # Next.js 14 + wagmi/viem + Tailwind — the dApp
+├── app/ · components/ · lib/   # Next.js 14 dApp at the repo root (Vercel-ready)
+└── contracts/                  # Solidity (Hardhat) — Launchpad + MemeToken + curve math
 ```
 
 ---
@@ -63,8 +63,8 @@ router may not be known yet:
 cd contracts
 pnpm install
 pnpm compile:check   # compiles with solc-js (solc 0.8.24, viaIR)
-pnpm sim             # 134 assertions over the curve/graduation math
-pnpm generate:abi    # regenerate web/lib/abi/*.ts from the Solidity
+pnpm sim             # 6300+ assertions over the curve/graduation math
+pnpm generate:abi    # regenerate ../lib/abi/*.ts from the Solidity
 ```
 
 > The full Hardhat test suite (`pnpm test`) and `pnpm compile` need network
@@ -91,16 +91,15 @@ Once a DEX exists on Robinhood Chain, set its router:
 
 ---
 
-## Web app
+## Web app (repo root)
 
 ```bash
-cd web
 pnpm install
-cp .env.example .env.local   # paste the launchpad address + deploy block
+cp .env.example .env.local   # optional — without it the app runs in Demo Mode
 pnpm dev                     # http://localhost:3000
 ```
 
-Environment (`web/.env.local`):
+Environment (`.env.local`):
 
 ```
 NEXT_PUBLIC_CHAIN_ID=4663
@@ -123,10 +122,20 @@ The API routes (`/api/tokens`, `/api/token/[address]`, `/api/trades/[address]`)
 read on-chain state and `Trade`/`TokenCreated` event logs via viem. For
 high-traffic production, swap in a dedicated indexer (Ponder/Subsquid).
 
-### Deploy the frontend
+### Demo Mode
 
-The `web/` folder is a standard Next.js app — deploy on Vercel with the project
-root set to `web/`, and add the `NEXT_PUBLIC_*` env vars.
+Until `NEXT_PUBLIC_LAUNCHPAD_ADDRESS` is set, the app runs a fully in-browser
+**Demo Mode**: a simulated launchpad (seeded tokens, working buy/sell, live
+price charts, portfolio) persisted in `localStorage`, so a fresh Vercel deploy
+is interactive immediately. Deploy the contract, set the address, and the app
+switches to real on-chain mode automatically — no code changes.
+
+### Deploy the frontend (Vercel)
+
+The repo root **is** the Next.js app, so Vercel auto-detects it — import the
+repo and deploy, with no root-directory or build config needed. Add the
+`NEXT_PUBLIC_*` env vars when you're ready to go live on-chain (without them the
+deploy simply runs in Demo Mode).
 
 ---
 

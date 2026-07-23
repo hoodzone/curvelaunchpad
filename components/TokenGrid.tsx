@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useTokens } from "@/lib/hooks";
-import { isLaunchpadConfigured } from "@/lib/contracts";
 import type { TokenSummary } from "@/lib/types";
 import { TokenCard } from "./TokenCard";
 
@@ -35,10 +34,6 @@ export function TokenGrid() {
     }
     return sorted;
   }, [data, q, sort]);
-
-  if (!isLaunchpadConfigured) {
-    return <NotConfigured />;
-  }
 
   return (
     <div>
@@ -119,18 +114,3 @@ function EmptyState({ hasQuery }: { hasQuery: boolean }) {
   );
 }
 
-function NotConfigured() {
-  return (
-    <div className="card p-8 text-center">
-      <h3 className="text-lg font-semibold">Launchpad not deployed yet</h3>
-      <p className="mx-auto mt-2 max-w-lg text-sm text-slate-400">
-        Deploy the contracts to Robinhood Chain and set{" "}
-        <code className="rounded bg-white/10 px-1.5 py-0.5 text-brand-400">
-          NEXT_PUBLIC_LAUNCHPAD_ADDRESS
-        </code>{" "}
-        in <code className="rounded bg-white/10 px-1.5 py-0.5">web/.env.local</code>. See the README
-        for the one-command deploy.
-      </p>
-    </div>
-  );
-}

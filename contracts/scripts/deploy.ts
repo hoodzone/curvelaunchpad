@@ -53,7 +53,7 @@ async function main() {
     console.log("\n(No DEX_ROUTER set — graduation will wait until setDexRouter is called.)");
   }
 
-  console.log("\n--- Copy into web/.env.local ---");
+  console.log("\n--- Copy into .env.local (repo root) ---");
   console.log(`NEXT_PUBLIC_LAUNCHPAD_ADDRESS=${launchpad.address}`);
   console.log(`NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK=${blockBefore.toString()}`);
 }

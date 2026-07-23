@@ -17,6 +17,7 @@ import { CHAIN_ID, CHAIN_NAME, CURRENCY_SYMBOL, explorerToken } from "@/lib/chai
 import { buyQuote, sellQuote } from "@/lib/curve";
 import { fmtEth, fmtToken } from "@/lib/format";
 import { useFeeBps } from "@/lib/hooks";
+import { DEMO_MODE, useDemo } from "@/lib/demo";
 
 type Side = "buy" | "sell";
 const SLIPPAGES = [1, 3, 5, 10];
@@ -27,6 +28,7 @@ export function BuySellWidget({ token, onTraded }: { token: TokenSummary; onTrad
   const { connect, connectors } = useConnect();
   const { switchChain } = useSwitchChain();
   const feeBps = useFeeBps();
+  const demo = useDemo();
 
   const [side, setSide] = useState<Side>("buy");
   const [amount, setAmount] = useState("");
@@ -59,8 +61,11 @@ export function BuySellWidget({ token, onTraded }: { token: TokenSummary; onTrad
     query: { enabled: !!address && side === "sell" },
   });
 
-  const tokenBal = (tokenBalRaw as bigint | undefined) ?? 0n;
+  const tokenBal = DEMO_MODE ? demo.balanceOf(tokenAddr) : (tokenBalRaw as bigint | undefined) ?? 0n;
   const allowance = (allowanceRaw as bigint | undefined) ?? 0n;
+  const effEthBal = DEMO_MODE ? demo.ethBalance : ethBal?.value ?? 0n;
+  const effConnected = DEMO_MODE ? demo.connected : isConnected;
+  const effWrongNet = !DEMO_MODE && chainId !== CHAIN_ID;
 
   const { writeContractAsync, isPending: isWriting } = useWriteContract();
   const { isLoading: isConfirming, isSuccess: confirmed } = useWaitForTransactionReceipt({
@@ -91,7 +96,7 @@ export function BuySellWidget({ token, onTraded }: { token: TokenSummary; onTrad
     return (quote * BigInt(10000 - slippage * 100)) / 10000n;
   }, [quote, slippage]);
 
-  const needsApproval = side === "sell" && amountWei > 0n && allowance < amountWei;
+  const needsApproval = !DEMO_MODE && side === "sell" && amountWei > 0n && allowance < amountWei;
 
   // React to confirmed transactions.
   useEffect(() => {
@@ -130,6 +135,24 @@ export function BuySellWidget({ token, onTraded }: { token: TokenSummary; onTrad
   async function handleTrade() {
     setError(null);
     if (amountWei === 0n) return;
+
+    // Demo mode: run the trade against the in-browser simulation.
+    if (DEMO_MODE) {
+      if (side === "buy" && amountWei > demo.ethBalance) {
+        setError("Insufficient demo balance.");
+        return;
+      }
+      if (side === "sell" && amountWei > tokenBal) {
+        setError("Not enough tokens to sell.");
+        return;
+      }
+      if (side === "buy") demo.buy(tokenAddr, amountWei);
+      else demo.sell(tokenAddr, amountWei);
+      setAmount("");
+      onTraded?.();
+      return;
+    }
+
     try {
       let hash: `0x${string}`;
       if (side === "buy") {
@@ -243,7 +266,7 @@ export function BuySellWidget({ token, onTraded }: { token: TokenSummary; onTrad
         <span>
           Balance:{" "}
           {side === "buy"
-            ? `${ethBal ? fmtEth(ethBal.value) : "0"} ${CURRENCY_SYMBOL}`
+            ? `${fmtEth(effEthBal)} ${CURRENCY_SYMBOL}`
             : `${fmtToken(tokenBal)} ${token.symbol}`}
         </span>
       </div>
@@ -290,14 +313,14 @@ export function BuySellWidget({ token, onTraded }: { token: TokenSummary; onTrad
 
       {/* Action button */}
       <div className="mt-4">
-        {!isConnected ? (
+        {!effConnected ? (
           <button
             className="btn-brand w-full"
-            onClick={() => connectors[0] && connect({ connector: connectors[0] })}
+            onClick={() => (DEMO_MODE ? demo.connect() : connectors[0] && connect({ connector: connectors[0] }))}
           >
             Connect Wallet
           </button>
-        ) : chainId !== CHAIN_ID ? (
+        ) : effWrongNet ? (
           <button className="btn-danger w-full" onClick={() => switchChain({ chainId: CHAIN_ID })}>
             Switch to {CHAIN_NAME}
           </button>

@@ -13,6 +13,7 @@ import { decodeEventLog, getAddress } from "viem";
 import { launchpadAbi, LAUNCHPAD_ADDRESS } from "@/lib/contracts";
 import { CHAIN_ID, CHAIN_NAME } from "@/lib/chain";
 import { buildTokenUri, isImageUrl } from "@/lib/metadata";
+import { DEMO_MODE, useDemo } from "@/lib/demo";
 import { TokenAvatar } from "./TokenAvatar";
 
 export function CreateTokenForm() {
@@ -20,6 +21,9 @@ export function CreateTokenForm() {
   const { isConnected, chainId } = useAccount();
   const { connect, connectors } = useConnect();
   const { switchChain } = useSwitchChain();
+  const demo = useDemo();
+  const effConnected = DEMO_MODE ? demo.connected : isConnected;
+  const effWrongNet = !DEMO_MODE && chainId !== CHAIN_ID;
 
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
@@ -69,6 +73,18 @@ export function CreateTokenForm() {
       setError("Enter a name and a 2–11 character symbol.");
       return;
     }
+
+    // Demo mode: create the token in the in-browser simulation and go to it.
+    if (DEMO_MODE) {
+      const addr = demo.createToken({
+        name: name.trim(),
+        symbol: symbol.trim().toUpperCase(),
+        uri: uriPreview,
+      });
+      if (addr) router.push(`/token/${addr}`);
+      return;
+    }
+
     try {
       const hash = await writeContractAsync({
         address: LAUNCHPAD_ADDRESS,
@@ -158,11 +174,14 @@ export function CreateTokenForm() {
           <div className="rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</div>
         )}
 
-        {!isConnected ? (
-          <button className="btn-brand w-full" onClick={() => connectors[0] && connect({ connector: connectors[0] })}>
+        {!effConnected ? (
+          <button
+            className="btn-brand w-full"
+            onClick={() => (DEMO_MODE ? demo.connect() : connectors[0] && connect({ connector: connectors[0] }))}
+          >
             Connect Wallet
           </button>
-        ) : chainId !== CHAIN_ID ? (
+        ) : effWrongNet ? (
           <button className="btn-danger w-full" onClick={() => switchChain({ chainId: CHAIN_ID })}>
             Switch to {CHAIN_NAME}
           </button>

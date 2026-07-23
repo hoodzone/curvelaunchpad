@@ -7,6 +7,7 @@ import type { Address } from "viem";
 import { useTokens } from "@/lib/hooks";
 import { memeTokenAbi } from "@/lib/contracts";
 import { CURRENCY_SYMBOL } from "@/lib/chain";
+import { DEMO_MODE, useDemo } from "@/lib/demo";
 import { fmtEth, fmtToken } from "@/lib/format";
 import { TokenAvatar } from "./TokenAvatar";
 import { WalletButton } from "./WalletButton";
@@ -14,8 +15,10 @@ import type { TokenSummary } from "@/lib/types";
 
 export function PortfolioView() {
   const { address, isConnected } = useAccount();
+  const demo = useDemo();
   const { data, isLoading } = useTokens();
-  const tokens: TokenSummary[] = data?.tokens ?? [];
+  const effConnected = DEMO_MODE ? demo.connected : isConnected;
+  const tokens: TokenSummary[] = DEMO_MODE ? demo.tokens : data?.tokens ?? [];
 
   const { data: balances } = useReadContracts({
     contracts: tokens.map((t) => ({
@@ -28,21 +31,23 @@ export function PortfolioView() {
   });
 
   const holdings = useMemo(() => {
-    if (!balances) return [];
-    return tokens
+    const rows = tokens
       .map((t, i) => {
-        const bal = (balances[i]?.result as bigint | undefined) ?? 0n;
+        const bal = DEMO_MODE
+          ? demo.balanceOf(t.address)
+          : (balances?.[i]?.result as bigint | undefined) ?? 0n;
         const price = BigInt(t.priceWei);
         const valueWei = (bal * price) / 10n ** 18n;
         return { token: t, balance: bal, valueWei };
       })
-      .filter((h) => h.balance > 0n)
-      .sort((a, b) => Number(b.valueWei - a.valueWei));
-  }, [balances, tokens]);
+      .filter((h) => h.balance > 0n);
+    rows.sort((a, b) => Number(b.valueWei - a.valueWei));
+    return rows;
+  }, [balances, tokens, demo]);
 
   const total = holdings.reduce((acc, h) => acc + h.valueWei, 0n);
 
-  if (!isConnected) {
+  if (!effConnected) {
     return (
       <div className="card flex flex-col items-center gap-4 p-12 text-center">
         <div className="text-4xl">👛</div>

@@ -15,9 +15,9 @@ export function buildTokenUri(meta: TokenMetadata): string {
   if (meta.twitter) clean.twitter = meta.twitter.trim();
   if (meta.telegram) clean.telegram = meta.telegram.trim();
   const json = JSON.stringify(clean);
-  // Use base64 for maximum wallet/explorer compatibility.
-  const b64 = typeof window === "undefined" ? Buffer.from(json).toString("base64") : btoa(unescape(encodeURIComponent(json)));
-  return `${JSON_DATA_PREFIX};base64,${b64}`;
+  // URL-encoded (not base64): keeps the on-chain payload small when it embeds a
+  // compressed logo data URI (base64 image inside base64 JSON would bloat ~33%).
+  return `${JSON_DATA_PREFIX},${encodeURIComponent(json)}`;
 }
 
 /** Synchronously parse a data:application/json URI. Returns null for other schemes. */

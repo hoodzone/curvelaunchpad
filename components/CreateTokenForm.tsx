@@ -15,6 +15,7 @@ import { CHAIN_ID, CHAIN_NAME } from "@/lib/chain";
 import { buildTokenUri, isImageUrl } from "@/lib/metadata";
 import { DEMO_MODE, useDemo } from "@/lib/demo";
 import { TokenAvatar } from "./TokenAvatar";
+import { ImageDropzone } from "./ImageDropzone";
 
 export function CreateTokenForm() {
   const router = useRouter();
@@ -131,18 +132,7 @@ export function CreateTokenForm() {
           </div>
         </div>
 
-        <div>
-          <label className="label">Image URL</label>
-          <input
-            className="input"
-            placeholder="https://…/logo.png"
-            value={image}
-            onChange={(e) => setImage(e.target.value)}
-          />
-          <p className="mt-1 text-xs text-slate-500">
-            Paste a hosted image URL. Metadata is stored on-chain (no IPFS needed).
-          </p>
-        </div>
+        <ImageDropzone value={image} onChange={setImage} />
 
         <div>
           <label className="label">Description</label>

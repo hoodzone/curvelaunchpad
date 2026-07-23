@@ -10,7 +10,7 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
-import { formatUnits, parseEther, parseUnits, maxUint256, type Address } from "viem";
+import { formatUnits, parseEther, parseUnits, type Address } from "viem";
 import type { TokenSummary } from "@/lib/types";
 import { launchpadAbi, memeTokenAbi, LAUNCHPAD_ADDRESS } from "@/lib/contracts";
 import { CHAIN_ID, CHAIN_NAME, CURRENCY_SYMBOL, explorerToken } from "@/lib/chain";
@@ -119,11 +119,13 @@ export function BuySellWidget({ token, onTraded }: { token: TokenSummary; onTrad
   async function handleApprove() {
     setError(null);
     try {
+      // Exact-amount approval (not infinite) so no standing allowance is left
+      // for the launchpad to pull beyond what this sell needs.
       const hash = await writeContractAsync({
         address: tokenAddr,
         abi: memeTokenAbi,
         functionName: "approve",
-        args: [LAUNCHPAD_ADDRESS, maxUint256],
+        args: [LAUNCHPAD_ADDRESS, amountWei],
       });
       setAction("approve");
       setTxHash(hash);

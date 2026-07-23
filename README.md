@@ -166,9 +166,21 @@ provider (Alchemy, QuickNode, dRPC, …) needs no code changes.
 
 ## Security notes
 
+**Contracts**
 - `buy` / `sell` / `finalizeGraduation` / `withdrawFees` are `nonReentrant` and follow checks-effects-interactions.
 - The contract is solvent by construction: ETH balance == `accruedFees + Σ ethReserve`.
+- Graduation adds liquidity with full min-amounts (a pre-created/skewed pair can't siphon the raise) and is decoupled from trading.
 - `MemeToken` is a standard fixed-supply ERC20 with no callbacks.
+
+**Frontend (anti-drainer hardening)**
+- Strict security headers on every response (see `next.config.mjs`): a Content-Security-Policy that limits `connect-src` to our origin + the configured RPC (no exfiltration to attacker endpoints), `frame-ancestors 'none'` + `X-Frame-Options: DENY` (anti-clickjacking / transaction-overlay), `object-src 'none'`, `base-uri`/`form-action 'self'`, plus `nosniff`, HSTS, COOP, and a restrictive `Permissions-Policy`.
+- No HTML-injection sinks: no `dangerouslySetInnerHTML`, all text is React-escaped, and creator-supplied URLs (token socials) are sanitized to http(s) only — `javascript:`/`data:` links are dropped.
+- All external links use `rel="noopener noreferrer"`.
+- Token sells request an **exact-amount** ERC20 approval (no infinite allowance left standing).
+- No secrets in the client — every configured value is a public `NEXT_PUBLIC_*` var; the deployer private key never leaves your machine.
+
+**Operational**
+- Keep the deployer/owner key in a dedicated wallet (ideally hardware/multisig) — it controls fees and the DEX router.
 - This is unaudited software for a fair-launch memecoin platform. Memecoins are
   high-risk; nothing here is financial advice. Get a professional audit before
   handling real value at scale.

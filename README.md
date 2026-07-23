@@ -73,11 +73,21 @@ pnpm generate:abi    # regenerate ../lib/abi/*.ts from the Solidity
 
 ### Deploy to Robinhood Chain
 
+You need a wallet funded with ETH on Robinhood Chain (bridge via the Arbitrum
+canonical bridge — see `docs.robinhood.com/chain/bridging`). Then:
+
 ```bash
 cd contracts
 cp .env.example .env      # set DEPLOYER_PRIVATE_KEY, FEE_RECIPIENT, etc.
-pnpm deploy:robinhood
+
+pnpm deploy:standalone    # recommended — compiles with solc-js + deploys via viem
+# or
+pnpm deploy:robinhood     # Hardhat (needs network access to fetch the solc binary)
 ```
+
+`deploy:standalone` is self-contained (no Hardhat solc download) and prints the
+exact `NEXT_PUBLIC_*` values to paste into Vercel. **Run it on your own machine
+— never paste a real private key into a shared/cloud session.**
 
 The script prints the launchpad address and deploy block:
 

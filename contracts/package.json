@@ -12,6 +12,7 @@
     "test": "hardhat test",
     "deploy:robinhood": "hardhat run scripts/deploy.ts --network robinhood",
     "deploy:testnet": "hardhat run scripts/deploy.ts --network robinhoodTestnet",
+    "deploy:standalone": "node deploy-standalone.mjs",
     "node": "hardhat node"
   },
   "devDependencies": {

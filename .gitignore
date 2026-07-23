@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+web/.next/
+web/out/
+web/build/
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+dist/
+
+# Env
+.env
+.env*.local
+*.env
+!.env.example
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.tsbuildinfo
+next-env.d.ts
+
+# Coverage / misc
+coverage/
+.solcov/
+deployments/local/

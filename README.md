@@ -1,0 +1,152 @@
+# CurveLaunch — Memecoin Launchpad on Robinhood Chain
+
+A pump.fun-style, fair-launch memecoin launchpad built for **Robinhood Chain**
+(EVM L2, Arbitrum Orbit / Nitro stack, chainId **4663**, gas token **ETH**).
+
+Every token launches onto its own **bonding curve** — no presale, no team
+allocation. Anyone buys/sells against a constant-product curve; when a token
+raises its target it **graduates**: liquidity migrates to a DEX and the LP
+tokens are burned, locking liquidity forever.
+
+```
+curvelaunchpad/
+├── contracts/   # Solidity (Hardhat) — Launchpad + MemeToken + curve math
+└── web/         # Next.js 14 + wagmi/viem + Tailwind — the dApp
+```
+
+---
+
+## How the curve works
+
+Each token uses a constant-product curve on **virtual reserves** `Ve` (ETH) and
+`Vt` (token), with `k = Ve · Vt` held constant per trade:
+
+- **buy:** `tokensOut = Vt · ethIn / (Ve + ethIn)`
+- **sell:** `ethOut = Ve · tokenIn / (Vt + tokenIn)`
+
+Constants (per token):
+
+| Parameter | Value |
+|---|---|
+| Total supply | 1,000,000,000 |
+| Sold on curve | 800,000,000 (80%) |
+| Reserved for DEX LP | 200,000,000 (20%) |
+| Initial virtual token `Vt₀` | 1,000,000,000 |
+| Initial virtual ETH `Ve₀` | `target / 4` |
+| Graduation target | configurable (default 4 ETH) |
+
+The reserves are seeded so the curve sells exactly the 800M curve allocation as
+the raise reaches the target. Two invariants hold by construction and are
+checked in `contracts/sim-check.mjs`:
+
+- `virtualEth == Ve₀ + ethReserve`
+- `virtualToken >= LP_TOKEN_RESERVE` (the curve never sells the LP allocation)
+
+**Graduation is two-phase** so it works on a brand-new chain whose canonical DEX
+router may not be known yet:
+
+1. When the raise hits the target, curve trading **halts**.
+2. If a DEX router is configured it migrates immediately; otherwise anyone can
+   call `finalizeGraduation(token)` once the owner sets the router via
+   `setDexRouter`. LP tokens are sent to `0x…dEaD` (locked).
+
+---
+
+## Contracts
+
+### Verify locally (no external downloads needed)
+
+```bash
+cd contracts
+pnpm install
+pnpm compile:check   # compiles with solc-js (solc 0.8.24, viaIR)
+pnpm sim             # 134 assertions over the curve/graduation math
+pnpm generate:abi    # regenerate web/lib/abi/*.ts from the Solidity
+```
+
+> The full Hardhat test suite (`pnpm test`) and `pnpm compile` need network
+> access to `binaries.soliditylang.org` to fetch the solc binary. In sandboxes
+> that block it, use `compile:check` + `sim` above, which are self-contained.
+
+### Deploy to Robinhood Chain
+
+```bash
+cd contracts
+cp .env.example .env      # set DEPLOYER_PRIVATE_KEY, FEE_RECIPIENT, etc.
+pnpm deploy:robinhood
+```
+
+The script prints the launchpad address and deploy block:
+
+```
+NEXT_PUBLIC_LAUNCHPAD_ADDRESS=0x…
+NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK=…
+```
+
+Once a DEX exists on Robinhood Chain, set its router:
+`launchpad.setDexRouter(<uniswapV2RouterAddress>)`.
+
+---
+
+## Web app
+
+```bash
+cd web
+pnpm install
+cp .env.example .env.local   # paste the launchpad address + deploy block
+pnpm dev                     # http://localhost:3000
+```
+
+Environment (`web/.env.local`):
+
+```
+NEXT_PUBLIC_CHAIN_ID=4663
+NEXT_PUBLIC_RPC_URL=https://rpc.mainnet.chain.robinhood.com
+NEXT_PUBLIC_EXPLORER_URL=https://robinhoodchain.blockscout.com
+NEXT_PUBLIC_LAUNCHPAD_ADDRESS=0x…
+NEXT_PUBLIC_LAUNCHPAD_DEPLOY_BLOCK=…
+RPC_URL=            # optional dedicated provider for server-side reads
+```
+
+Features:
+
+- **Explore** — live grid of tokens with search + sort (new / market cap / curve progress)
+- **Launch** — create a token in ~30s; metadata (image, description, socials) is stored **on-chain** as a data URI (no IPFS needed)
+- **Token page** — price chart, bonding-curve progress, buy/sell widget with slippage, live trades feed
+- **Portfolio** — your holdings valued on the curve
+- **Wallet** — MetaMask (injected) with add/switch to Robinhood Chain
+
+The API routes (`/api/tokens`, `/api/token/[address]`, `/api/trades/[address]`)
+read on-chain state and `Trade`/`TokenCreated` event logs via viem. For
+high-traffic production, swap in a dedicated indexer (Ponder/Subsquid).
+
+### Deploy the frontend
+
+The `web/` folder is a standard Next.js app — deploy on Vercel with the project
+root set to `web/`, and add the `NEXT_PUBLIC_*` env vars.
+
+---
+
+## Network details (Robinhood Chain mainnet)
+
+| | |
+|---|---|
+| Chain ID | 4663 |
+| RPC | `https://rpc.mainnet.chain.robinhood.com` (public, rate-limited) |
+| Explorer | `https://robinhoodchain.blockscout.com` |
+| Gas token | ETH |
+| Stack | Arbitrum Orbit (Nitro) |
+
+Every value is env-overridable, so pointing at a testnet or a dedicated RPC
+provider (Alchemy, QuickNode, dRPC, …) needs no code changes.
+
+---
+
+## Security notes
+
+- `buy` / `sell` / `finalizeGraduation` / `withdrawFees` are `nonReentrant` and follow checks-effects-interactions.
+- The contract is solvent by construction: ETH balance == `accruedFees + Σ ethReserve`.
+- `MemeToken` is a standard fixed-supply ERC20 with no callbacks.
+- This is unaudited software for a fair-launch memecoin platform. Memecoins are
+  high-risk; nothing here is financial advice. Get a professional audit before
+  handling real value at scale.

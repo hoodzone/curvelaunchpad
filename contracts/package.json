@@ -1,0 +1,25 @@
+{
+  "name": "@curvelaunchpad/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bonding-curve memecoin launchpad smart contracts for Robinhood Chain",
+  "type": "commonjs",
+  "scripts": {
+    "compile": "hardhat compile",
+    "compile:check": "node compile-check.mjs",
+    "sim": "node sim-check.mjs",
+    "generate:abi": "node generate-abi.mjs",
+    "test": "hardhat test",
+    "deploy:robinhood": "hardhat run scripts/deploy.ts --network robinhood",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network robinhoodTestnet",
+    "node": "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
+    "@openzeppelin/contracts": "^5.1.0",
+    "hardhat": "^2.22.16",
+    "solc": "0.8.24",
+    "typescript": "^5.6.3",
+    "viem": "^2.21.0"
+  }
+}

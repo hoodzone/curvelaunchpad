@@ -146,27 +146,32 @@ describe("Launchpad", () => {
     const gas = receipt.gasUsed * receipt.effectiveGasPrice;
     const after = await f.publicClient.getBalance({ address: f.bob.account.address });
 
-    const pool = await f.launchpad.read.getPool([token]);
+    // The crossing buy only HALTS the curve (migration is a separate step).
+    let pool = await f.launchpad.read.getPool([token]);
     expect(pool.halted).to.equal(true);
-    expect(pool.graduated).to.equal(true);
-    expect(pool.ethReserve).to.equal(0n); // moved into the LP
+    expect(pool.graduated).to.equal(false);
+    expect(pool.ethReserve).to.equal(f.target); // ETH still escrowed pre-migration
 
     // Buyer only spent enough to reach the target (4 ETH + 1% fee) + gas.
     const spent = before - after - gas;
     expect(spent).to.be.lessThan(parseEther("4.05"));
     expect(spent).to.be.greaterThan(parseEther("4"));
 
-    // Router received the launchpad's remaining token balance as liquidity.
-    expect(await meme.read.balanceOf([f.launchpad.address])).to.equal(0n);
-    expect(await meme.read.balanceOf([router.address])).to.be.greaterThan(0n);
-
-    // Trading is closed post-graduation.
+    // Trading is closed once halted.
     await expect(
       f.launchpad.write.buy([token, 0n, deadline()], {
         account: f.bob.account,
         value: parseEther("0.1"),
       })
     ).to.be.rejected;
+
+    // Anyone can finalize migration; liquidity moves to the DEX.
+    await f.launchpad.write.finalizeGraduation([token], { account: f.bob.account });
+    pool = await f.launchpad.read.getPool([token]);
+    expect(pool.graduated).to.equal(true);
+    expect(pool.ethReserve).to.equal(0n); // moved into the LP
+    expect(await meme.read.balanceOf([f.launchpad.address])).to.equal(0n);
+    expect(await meme.read.balanceOf([router.address])).to.be.greaterThan(0n);
   });
 
   it("halts but waits for a router when none is configured", async () => {

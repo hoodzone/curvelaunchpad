@@ -42,17 +42,18 @@ function buy(p, grossIn, feeBps) {
   const remaining = p.target - p.ethReserve;
   const grossCap = feeBps === 0n ? remaining : mulDivCeil(remaining, BPS, BPS - feeBps);
   let refund = 0n;
-  let graduate = false;
-  if (grossIn >= grossCap) {
+  if (grossIn > grossCap) {
     refund = grossIn - grossCap;
     grossIn = grossCap;
-    graduate = true;
   }
   let fee = mulDivFloor(grossIn, feeBps, BPS);
   let curveEth = grossIn - fee;
-  if (graduate) {
+  // Graduate based on the resulting reserve, mirroring Launchpad.buy.
+  let graduate = false;
+  if (curveEth >= remaining) {
     curveEth = remaining;
     fee = grossIn - curveEth;
+    graduate = true;
   }
   let tokensOut = mulDivFloor(p.virtualToken, curveEth, p.virtualEth + curveEth);
   const sellable = p.virtualToken - LP_TOKEN_RESERVE;
@@ -168,6 +169,25 @@ function invariants(p, label) {
   assert(graduated, "S5: eventually graduates via small buys");
   assert(p.ethReserve === target, "S5: ethReserve exactly target");
   invariants(p, "S5 final");
+}
+
+// --- Scenario 6: reaching the target ALWAYS halts (no stuck-at-target state) ---
+// Sweeps many buy sizes (incl. odd wei amounts that stress fee rounding) and
+// asserts the pool can never sit at ethReserve == target without being halted.
+{
+  const feeBps = 100n;
+  const target = 4n * E;
+  for (let step = 1n; step <= 400n; step++) {
+    const p = newPool(target);
+    const size = (target * step) / 400n + (step % 7n); // varied + odd-wei jitter
+    let guard = 0;
+    while (!p.halted && guard++ < 100000) {
+      buy(p, size, feeBps);
+      assert(p.ethReserve <= target, `S6: ethReserve never exceeds target (step ${step})`);
+      assert(!(p.ethReserve === target && !p.halted), `S6: at-target implies halted (step ${step})`);
+    }
+    assert(p.halted && p.ethReserve === target, `S6: graduates exactly on target (step ${step})`);
+  }
 }
 
 console.log(`\nBonding-curve math simulation: ${passed} passed, ${failed} failed.`);

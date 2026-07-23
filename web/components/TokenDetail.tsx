@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { formatUnits } from "viem";
 import { useToken, useTokenMetadata, useTrades } from "@/lib/hooks";
+import { safeHttpUrl } from "@/lib/metadata";
 import { CURRENCY_SYMBOL, explorerAddress, explorerToken } from "@/lib/chain";
 import { fmtEth, fmtPrice, shortAddr, timeAgo } from "@/lib/format";
 import { TokenAvatar } from "./TokenAvatar";
@@ -31,6 +32,12 @@ export function TokenDetail({ address }: { address: string }) {
       </div>
     );
   }
+
+  // Sanitize creator-supplied social links: only allow http(s) hrefs so a
+  // `javascript:`/`data:` URL in on-chain metadata can't execute as XSS.
+  const website = safeHttpUrl(meta?.website);
+  const twitter = meta?.twitter ? safeHttpUrl(normalizeTwitter(meta.twitter)) : null;
+  const telegram = meta?.telegram ? safeHttpUrl(normalizeTelegram(meta.telegram)) : null;
 
   const trades = tradesData?.trades ?? [];
   const priceWei = BigInt(token.priceWei);
@@ -111,14 +118,14 @@ export function TokenDetail({ address }: { address: string }) {
           </div>
 
           {/* About + socials */}
-          {(meta?.description || meta?.website || meta?.twitter || meta?.telegram) && (
+          {(meta?.description || website || twitter || telegram) && (
             <div className="card p-5">
               <h3 className="mb-2 font-semibold">About</h3>
               {meta?.description && <p className="text-sm text-slate-300">{meta.description}</p>}
               <div className="mt-3 flex flex-wrap gap-2">
-                {meta?.website && <SocialLink href={meta.website} label="Website" />}
-                {meta?.twitter && <SocialLink href={normalizeTwitter(meta.twitter)} label="Twitter" />}
-                {meta?.telegram && <SocialLink href={normalizeTelegram(meta.telegram)} label="Telegram" />}
+                {website && <SocialLink href={website} label="Website" />}
+                {twitter && <SocialLink href={twitter} label="Twitter" />}
+                {telegram && <SocialLink href={telegram} label="Telegram" />}
                 <a href={explorerToken(token.address)} target="_blank" rel="noopener noreferrer" className="chip bg-white/5 hover:bg-white/10">
                   Explorer ↗
                 </a>

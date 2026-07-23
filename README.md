@@ -45,10 +45,13 @@ checked in `contracts/sim-check.mjs`:
 **Graduation is two-phase** so it works on a brand-new chain whose canonical DEX
 router may not be known yet:
 
-1. When the raise hits the target, curve trading **halts**.
-2. If a DEX router is configured it migrates immediately; otherwise anyone can
-   call `finalizeGraduation(token)` once the owner sets the router via
-   `setDexRouter`. LP tokens are sent to `0x…dEaD` (locked).
+1. When the raise hits the target, curve trading **halts** (the crossing buy only
+   halts — migration is never done inside a trade, so a failing/griefed liquidity
+   add can't block buys).
+2. Anyone can then call `finalizeGraduation(token)` (permissionless) once the
+   owner has set a router via `setDexRouter`. Liquidity is added with **full
+   min-amounts** so a pre-created / skewed pair can't siphon the raise, and LP
+   tokens are sent to `0x…dEaD` (locked).
 
 ---
 

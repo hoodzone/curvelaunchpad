@@ -155,6 +155,10 @@ contract Launchpad is Ownable, ReentrancyGuard {
         require(feeRecipient_ != address(0), "fee recipient zero");
         require(feeBps_ <= MAX_FEE_BPS, "fee too high");
         require(defaultTargetRaise_ >= VIRTUAL_ETH_DIVISOR, "target too small");
+        // Must divide evenly so Ve0 = target/4 is exact; otherwise the curve
+        // exhausts its sellable supply before the raise reaches the target and
+        // the pool can never graduate.
+        require(defaultTargetRaise_ % VIRTUAL_ETH_DIVISOR == 0, "target not divisible");
         feeRecipient = feeRecipient_;
         feeBps = feeBps_;
         defaultTargetRaise = defaultTargetRaise_;
@@ -222,20 +226,23 @@ contract Launchpad is Ownable, ReentrancyGuard {
 
         uint256 grossIn = msg.value;
         uint256 refund = 0;
-        bool graduate = false;
-
-        if (grossIn >= grossCap) {
+        if (grossIn > grossCap) {
             refund = grossIn - grossCap;
             grossIn = grossCap;
-            graduate = true;
         }
 
         uint256 fee = Math.mulDiv(grossIn, feeBps, BPS);
         uint256 curveEth = grossIn - fee;
-        if (graduate) {
-            // Land exactly on the target regardless of rounding.
+
+        // Graduation is decided by the resulting reserve (curveEth reaching
+        // `remaining`), NOT by a gross/cap comparison. Deciding it from the cap
+        // let fee rounding land ethReserve exactly on the target without halting,
+        // which bricked the pool (every later buy reverted with 0 remaining).
+        bool graduate = false;
+        if (curveEth >= remaining) {
             curveEth = remaining;
             fee = grossIn - curveEth;
+            graduate = true;
         }
 
         tokensOut = Math.mulDiv(p.virtualToken, curveEth, p.virtualEth + curveEth);
@@ -335,11 +342,10 @@ contract Launchpad is Ownable, ReentrancyGuard {
         Pool storage p = _pools[token];
         p.halted = true;
         emit Halted(token, p.ethReserve, block.timestamp);
-        // Migrate immediately if a DEX router is configured; otherwise the pool
-        // stays halted and awaits `finalizeGraduation` once the owner sets one.
-        if (dexRouter != address(0)) {
-            _finalize(token);
-        }
+        // Migration is intentionally NOT performed here. It runs in a separate
+        // `finalizeGraduation` call (permissionless) so that a failing or griefed
+        // addLiquidityETH can never revert — and therefore block — the buy that
+        // fills the curve. Anyone can finalize once a router is configured.
     }
 
     /// @notice Migrate a halted pool's ETH + reserved tokens into the DEX.
@@ -363,11 +369,16 @@ contract Launchpad is Ownable, ReentrancyGuard {
         uint256 tokenLiquidity = IERC20(token).balanceOf(address(this));
 
         IERC20(token).forceApprove(router, tokenLiquidity);
+        // Full min amounts: this is meant to be the token's first, freshly created
+        // pair. If a pair was pre-created at a skewed ratio the router would only
+        // consume part of one side at that attacker-chosen price; requiring the
+        // full desired amounts makes such an add revert (funds stay put for the
+        // owner to handle) instead of seeding liquidity at a manipulated price.
         (, , uint256 lp) = IDexRouter(router).addLiquidityETH{value: ethLiquidity}(
             token,
             tokenLiquidity,
-            0,
-            0,
+            tokenLiquidity,
+            ethLiquidity,
             DEAD,
             block.timestamp + 1 hours
         );
@@ -452,6 +463,7 @@ contract Launchpad is Ownable, ReentrancyGuard {
 
     function setDefaultTargetRaise(uint256 target) external onlyOwner {
         require(target >= VIRTUAL_ETH_DIVISOR, "target too small");
+        require(target % VIRTUAL_ETH_DIVISOR == 0, "target not divisible");
         defaultTargetRaise = target;
         emit DefaultTargetRaiseUpdated(target);
     }
@@ -472,4 +484,9 @@ contract Launchpad is Ownable, ReentrancyGuard {
         (bool ok, ) = payable(to).call{value: amount}("");
         require(ok, "eth transfer failed");
     }
+
+    /// @notice Accept ETH, e.g. a DEX router refunding unused value during
+    ///         graduation. Such stray ETH is not attributed to any pool and does
+    ///         not affect curve accounting.
+    receive() external payable {}
 }

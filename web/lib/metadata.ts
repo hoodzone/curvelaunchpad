@@ -43,3 +43,18 @@ export function isImageUrl(url?: string): boolean {
   if (!url) return false;
   return /^https?:\/\//.test(url) || url.startsWith("data:image/");
 }
+
+/**
+ * Return `url` only if it is a safe http(s) link, else null. Blocks
+ * `javascript:`, `data:`, and other schemes that would enable XSS when a
+ * creator-supplied metadata value is used as an anchor href.
+ */
+export function safeHttpUrl(url?: string): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url.trim());
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
